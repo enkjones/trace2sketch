@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trace to Sketch</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 1rem;
+        }
+
+        #app {
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .preview {
+            position: relative;
+            border: 1px solid #ccc;
+            margin-top: 1rem;
+            width: 100%;
+            height: auto;
+        }
+
+        img.uploaded {
+            width: 100%;
+            display: block;
+        }
+
+        .controls {
+            margin-top: 1rem;
+        }
+
+        input[type=range] {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h1>Trace to Sketch</h1>
+    <p>Upload a photo from your iPhone (or any device) and adjust the opacity to trace it on paper.</p>
+    <input type="file" @change="onFileChange" accept="image/*" />
+
+    <div class="controls" v-if="imageSrc">
+        <label>Opacity: {{ opacity.toFixed(2) }}</label>
+        <input type="range" min="0" max="1" step="0.01" v-model.number="opacity" />
+    </div>
+
+    <div class="preview" v-if="imageSrc">
+        <img :src="imageSrc" class="uploaded" :style="{ opacity: opacity }" />
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref } = Vue;
+
+createApp({
+    setup() {
+        const imageSrc = ref('');
+        const opacity = ref(0.5);
+
+        const onFileChange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imageSrc.value = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        return { imageSrc, opacity, onFileChange };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
