@@ -5,84 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Trace to Sketch</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
             padding: 1rem;
         }
 
-        #app {
-            max-width: 600px;
-            margin: auto;
+        h1 { font-size: 1.4rem; margin-bottom: 0.75rem; }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 1rem;
         }
+
+        .toolbar label { font-size: 0.9rem; white-space: nowrap; }
+        .toolbar input[type=range] { width: 160px; }
+
+        .upload-btn {
+            padding: 0.5rem 1rem;
+            background: #0a84ff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .upload-btn:active { opacity: 0.7; }
+
+        #fileInput { display: none; }
 
         .preview {
             position: relative;
-            border: 1px solid #ccc;
-            margin-top: 1rem;
             width: 100%;
-            height: 60vh; /* ensure a box for camera */
+            height: 75vh;
             background: #000;
+            border-radius: 8px;
             overflow: hidden;
         }
 
-        video.camera {
+        video {
             position: absolute;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
             z-index: 1;
         }
 
-        img.uploaded {
+        img.overlay {
             position: absolute;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: contain;
             z-index: 2;
         }
 
-        .controls {
-            margin-top: 1rem;
-        }
-
-        input[type=range] {
-            width: 100%;
+        .hint {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 1rem;
+            z-index: 0;
         }
     </style>
 </head>
 <body>
 <div id="app">
     <h1>Trace to Sketch</h1>
-    <p>Touch <strong>Start camera</strong> below, grant permission, then upload a photo to overlay it on the live view.</p>
-    <button @click="startCamera" v-if="!videoReady">Start camera</button>
-    <input type="file" @change="onFileChange" accept="image/*" />
 
-    <div class="controls" v-if="imageSrc">
-        <label>Opacity: {{ opacity.toFixed(2) }}</label>
-        <input type="range" min="0" max="1" step="0.01" v-model.number="opacity" />
+    <div class="toolbar">
+        <button class="upload-btn" @click="$refs.fileInput.click()">Upload photo</button>
+        <input id="fileInput" type="file" ref="fileInput" accept="image/*" @change="onFileChange" />
+
+        <template v-if="imageSrc">
+            <label>Opacity: {{ Math.round(opacity * 100) }}%</label>
+            <input type="range" min="0" max="1" step="0.01" v-model.number="opacity" />
+        </template>
     </div>
 
-    <div class="preview" v-if="videoReady || imageSrc">
-        <!-- camera feed underneath -->
-        <video
-            ref="video"
-            autoplay
-            playsinline
-            class="camera"
-            v-if="videoReady"
-        ></video>
-
-        <!-- uploaded image on top -->
-        <img
-            v-if="imageSrc"
-            :src="imageSrc"
-            class="uploaded"
-            :style="{ opacity: opacity }"
-        />
+    <div class="preview">
+        <div class="hint" v-if="!videoReady">Camera starting…</div>
+        <video ref="videoEl" autoplay playsinline muted></video>
+        <img v-if="imageSrc" class="overlay" :src="imageSrc" :style="{ opacity: opacity }" />
     </div>
 </div>
 
@@ -92,40 +106,35 @@ const { createApp, ref, onMounted } = Vue;
 
 createApp({
     setup() {
-        const imageSrc = ref('');
-        const opacity = ref(0.5);
-        const videoRef = ref(null);
+        const imageSrc  = ref('');
+        const opacity   = ref(0.5);
+        const videoEl   = ref(null);   // matches ref="videoEl" in the template
         const videoReady = ref(false);
 
-        const startCamera = async () => {
+        onMounted(async () => {
             try {
-                // user gesture may be required on iOS/Safari
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                if (videoRef.value) {
-                    videoRef.value.srcObject = stream;
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                videoEl.value.srcObject = stream;
+                videoEl.value.onloadedmetadata = () => {
+                    videoEl.value.play();
                     videoReady.value = true;
-                }
-            } catch (err) {
-                console.warn('Could not start camera', err);
+                };
+            } catch (e) {
+                console.error('Camera error:', e);
             }
-        };
+        });
 
         const onFileChange = (event) => {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => {
-                imageSrc.value = e.target.result;
-            };
+            reader.onload = (e) => { imageSrc.value = e.target.result; };
             reader.readAsDataURL(file);
         };
 
-        onMounted(() => {
-            // try to start automatically, but user interaction may be needed
-            startCamera();
-        });
-
-        return { imageSrc, opacity, onFileChange, videoRef, videoReady, startCamera };
+        return { imageSrc, opacity, videoEl, videoReady, onFileChange };
     }
 }).mount('#app');
 </script>
